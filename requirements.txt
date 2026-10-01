@@ -1,7 +1,0 @@
-streamlit>=1.40,<2
-numpy>=2.0,<3
-opencv-python-headless>=4.10
-Pillow>=10.1
-pillow-heif>=0.18
-torch
-transformers>=4.45
