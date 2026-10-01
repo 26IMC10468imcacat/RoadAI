@@ -1,0 +1,8 @@
+[server]
+maxUploadSize = 400
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "light"
