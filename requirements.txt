@@ -1,0 +1,8 @@
+Flask>=3.0
+requests>=2.31
+gunicorn>=22.0
+# Bildauswertung (auswertung/Lebende_Strasse.py)
+numpy>=1.26
+opencv-python-headless>=4.9
+Pillow>=10.0
+pillow-heif>=0.16

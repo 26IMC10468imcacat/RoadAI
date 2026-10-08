@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="de-AT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>RoadSense</title>
+<meta name="description" content="RoadSense – AI-powered road safety and condition management">
+<meta name="theme-color" content="#1d2226">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/static/icon-192.png">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="RoadSense">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="kopf">
+  <button class="zurueck" id="zurueck" type="button" aria-label="Zurück zur Auswahl" hidden>←</button>
+  <div class="marke"><img src="/static/icon-192.png" alt="" width="28" height="28"><span class="markentext"><span class="markenname">RoadSense</span><span class="claim">AI-powered road safety and condition management</span></span></div>
+  <div class="status" id="status" aria-live="polite"></div>
+  <button class="kontochip" type="button" data-aktion="konto" aria-haspopup="dialog" title="Angemeldet als Magistrat Krems">
+    <span class="avatar" aria-hidden="true">MK</span><span class="kontoname">Magistrat Krems</span>
+  </button>
+</header>
+
+<main id="inhalt" tabindex="-1"></main>
+
+<nav class="tabs" id="tabs" hidden aria-label="Bereiche">
+  <button type="button" data-ansicht="strecke"><span aria-hidden="true">▤</span>Strecke</button>
+  <button type="button" data-ansicht="ergebnis"><span aria-hidden="true">◆</span>Bewertung</button>
+  <button type="button" data-ansicht="chat"><span aria-hidden="true">✦</span>Assistent</button>
+</nav>
+
+<dialog class="konto" id="konto" aria-labelledby="konto-titel">
+  <div class="konto-kopf">
+    <h2 id="konto-titel">Konto</h2>
+    <button type="button" class="konto-x" data-aktion="konto-zu" aria-label="Schließen">✕</button>
+  </div>
+  <div class="angemeldet">
+    <span class="avatar gross" aria-hidden="true">MK</span>
+    <div><b>Magistrat Krems</b><span class="klein">Angemeldet · Stadt Krems an der Donau</span></div>
+    <button type="button" class="knopf zweit klein-knopf" data-aktion="abmelden">Abmelden</button>
+  </div>
+  <div class="reiter" role="tablist">
+    <button type="button" role="tab" data-aktion="konto-reiter" data-id="anmelden" aria-selected="true">Anmelden</button>
+    <button type="button" role="tab" data-aktion="konto-reiter" data-id="registrieren" aria-selected="false">Registrieren</button>
+  </div>
+  <form id="form-anmelden" class="felder" autocomplete="off">
+    <label>E-Mail<input type="email" placeholder="name@gemeinde.at"></label>
+    <label>Passwort<input type="password" placeholder="••••••••"></label>
+    <button class="knopf akzent" type="submit">Anmelden</button>
+    <p class="klein">Demo: Die Anmeldung ist noch nicht aktiv.</p>
+  </form>
+  <form id="form-registrieren" class="felder" autocomplete="off" hidden>
+    <label>Gemeinde / Organisation<input placeholder="z. B. Stadt Krems an der Donau"></label>
+    <label>Name<input placeholder="Vor- und Nachname"></label>
+    <label>E-Mail<input type="email" placeholder="name@gemeinde.at"></label>
+    <label>Passwort<input type="password" placeholder="mindestens 8 Zeichen"></label>
+    <button class="knopf akzent" type="submit">Registrieren</button>
+    <p class="klein">Demo: Die Registrierung ist noch nicht aktiv.</p>
+  </form>
+</dialog>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<input type="file" id="datei" accept="application/json,.json" hidden>
+<input type="file" id="kamera" accept="image/*" capture="environment" hidden>
+<input type="file" id="galerie" accept="image/*,.heic,.heif" multiple hidden>
+<noscript><p style="padding:16px">RoadSense braucht JavaScript.</p></noscript>
+<script src="/static/fotos.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

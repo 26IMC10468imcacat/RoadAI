@@ -1,0 +1,108 @@
+RoadSense Web-App: Übergabe
+============================
+
+Was ist das?
+------------
+Die mobile Webseite von RoadSense. Man kann damit
+  - mit dem Handy eine Straße fotografieren oder Fotos aus der Galerie wählen,
+  - die Fotos automatisch auswerten lassen (Programm auswertung/Lebende_Strasse.py),
+  - das Ergebnis mit Karte, Fotos und Draufsichten ansehen,
+  - eine KI-Bewertung bekommen, das Ergebnis in Google Sheets eintragen und Fragen an den Assistenten stellen.
+Zum Ansehen gibt es die zwei echten Teststrecken (Teststrecke 01 und 02, Langenlois).
+
+
+Empfohlen: Webseite auf Render + ein Laptop rechnet die Fotos
+-------------------------------------------------------------
+Die Webseite läuft dauerhaft und kostenlos auf Render (Gratis-Plan). Für die Fotoauswertung
+reicht dort der Speicher nicht, deshalb schickt Render die Fotos an EINEN Laptop, der sie
+berechnet und das Ergebnis zurückgibt. Ist der Laptop aus, funktioniert alles außer
+"Fotos auswerten"; die Seite zeigt dann einen Hinweis.
+
+Einmalig auf dem Laptop:
+  1. Diese ZIP entpacken (Rechtsklick -> "Alle extrahieren").
+  2. Doppelklick auf "Auswerte_Laptop_starten.bat".
+     Beim ersten Mal wird Tailscale installiert. Danach rechts unten im Infobereich auf das
+     Tailscale-Symbol klicken, "Log in" und mit dem Google-Konto anmelden.
+  3. "Auswerte_Laptop_starten.bat" erneut starten. Beim allerersten Mal erscheint ein Link,
+     um "Funnel" freizuschalten: öffnen, bestätigen, die .bat noch einmal starten.
+  4. Im Fenster stehen jetzt
+       - der Schlüssel (AUSWERTUNG_TOKEN) und
+       - die feste Adresse des Laptops, z. B. https://laptop-name.tail1234.ts.net
+  5. Energieoptionen: Am Netzteil "Energiesparmodus: Nie" einstellen.
+
+Einmalig auf Render (Dashboard -> euer Dienst -> Environment -> Add Environment Variable):
+  AUSWERTUNG_URL    = die feste Adresse des Laptops
+  AUSWERTUNG_TOKEN  = der Schlüssel aus dem Laptop-Fenster
+  Speichern. Render startet neu. Instance Type darf "Free" bleiben.
+
+Jedes Mal, wenn ausgewertet werden soll:
+  Doppelklick auf "Auswerte_Laptop_starten.bat" und beide Fenster offen lassen.
+  Fotos aufnehmen und auswerten geht dann ganz normal über die Render-Adresse.
+
+Hinweise:
+  - Der Schlüssel sorgt dafür, dass nur eure Render-Seite den Laptop rechnen lassen kann.
+    Er steht in der Datei .env auf dem Laptop. Nicht weitergeben, nicht auf GitHub hochladen.
+  - Fotos liegen nur vorübergehend auf dem Laptop (Temp-Ordner) und werden automatisch aufgeräumt.
+  - Render (Gratis) schläft nach 15 Minuten ohne Besuch ein; der erste Aufruf dauert dann ca. 1 Minute.
+
+
+Alternative: alles auf einem PC (ohne Render)
+------------------------------------------
+Voraussetzung: Windows-PC mit Python (Befehl "py") und Internet.
+Der PC muss laufen, solange die Seite erreichbar sein soll.
+
+Einmalig:
+  1. Die ZIP mit Rechtsklick -> "Alle extrahieren" entpacken.
+  2. Im entpackten Ordner die Datei ".env.example" kopieren und die Kopie ".env" nennen.
+     Mit dem Editor öffnen und den eigenen Claude-API-Schlüssel hinter ANTHROPIC_API_KEY= eintragen.
+     (Optional: Zapier-Adresse hinter ZAPIER_WEBHOOK_URL=.)
+     Die Datei .env nie weitergeben.
+
+Jedes Mal:
+  3. Doppelklick auf "1_App_starten.bat"   -> Fenster offen lassen.
+     Test am PC: http://localhost:8000
+  4. Doppelklick auf "2_Tunnel_starten.bat" -> Fenster offen lassen.
+     Beim ersten Mal wird nur "cloudflared" installiert; danach die Datei noch einmal starten.
+     Es erscheint eine Adresse wie https://irgendwas.trycloudflare.com -> am Handy öffnen.
+     Die Adresse ändert sich bei jedem Neustart des Tunnels.
+
+Falls Windows die .bat-Dateien blockiert ("Intelligente App-Steuerung"):
+Im entpackten Ordner oben in die Adresszeile "cmd" tippen, Enter, und eingeben:
+     py -m pip install flask requests numpy opencv-python pillow
+     py app.py
+In einem zweiten cmd-Fenster:
+     winget install --id Cloudflare.cloudflared
+     cloudflared tunnel --url http://localhost:8000
+
+
+Am Handy
+--------
+"Neue Strecke aufnehmen" -> Name und Ort eintragen -> "Geführte Aufnahme starten"
+(Kamera mit Assistent: zeigt den Abstand zum letzten Foto, Signal bei 5 m,
+prüft jedes Foto auf Schärfe und Licht) oder "Fotos aus Galerie wählen". Etwa alle 5 m ein Foto, in Fahrtrichtung,
+beide Fahrbahnränder im Bild, 2 bis 25 Fotos. Standortabfrage erlauben.
+Dann "Fotos auswerten". Dauer etwa 10-20 Sekunden pro Foto.
+
+
+Alternative: dauerhaft online über Render
+-----------------------------------------
+Siehe README.md, Abschnitt "Online stellen". Achtung: Für die Fotoauswertung braucht es
+den Render-Plan "Standard" (2 GB). Mit "Free" läuft die Seite, aber das Auswerten scheitert am Speicher.
+
+
+Neue Version des Auswerteprogramms
+----------------------------------
+Die neue Lebende_Strasse.py in den Ordner "auswertung" kopieren (alte ersetzen)
+und 1_App_starten.bat neu starten. Sonst muss nichts geändert werden.
+
+
+Ordner
+------
+  app.py, roadai_core.py, auswertung_server.py   Server der Web-App
+  fernauswertung.py                              Weiterleitung der Fotos an den Auswerte-Laptop
+  Auswerte_Laptop_starten.bat                    startet den Auswerte-Laptop (App + Tailscale Funnel)
+  auswertung/Lebende_Strasse.py                  das Auswerteprogramm
+  static/                                         die Webseite (Handy-Oberfläche)
+  data/                                           Teststrecke 01 und 02
+  tests/                                          automatische Crash-Tests (py -m unittest discover -s tests)
+  README.md                                       ausführliche Anleitung (Zapier, Render, Crash Test)

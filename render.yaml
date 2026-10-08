@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: roadai
+    runtime: python
+    region: frankfurt
+    # Die Fotos rechnet der Auswerte-Laptop (AUSWERTUNG_URL), daher reicht der Gratis-Plan.
+    # Ohne Laptop braucht die Auswertung "standard" (2 GB).
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --workers 1 --threads 4 --timeout 300 --bind 0.0.0.0:$PORT
+    healthCheckPath: /api/status
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ZAPIER_WEBHOOK_URL
+        sync: false
+      - key: AUSWERTUNG_URL
+        sync: false
+      - key: AUSWERTUNG_TOKEN
+        sync: false
+      - key: CLAUDE_MODEL
+        value: claude-sonnet-5-5
+      - key: SECRET_KEY
+        generateValue: true
+      - key: PYTHON_VERSION
+        value: 3.12.7

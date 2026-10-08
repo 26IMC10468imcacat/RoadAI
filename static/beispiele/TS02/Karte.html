@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Langenloiserstraße – Karte</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+*{box-sizing:border-box} html,body{height:100%;margin:0}
+body{font-family:"Segoe UI","Helvetica Neue",Arial,sans-serif;color:#1d2226;background:#e9ecea;display:flex;flex-direction:column}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px;padding:12px 16px;background:#fff;border-bottom:1px solid #d9ddd9}
+header h1{font-size:1.15rem;margin:0} header span{font-size:.85rem;color:#5d666d}
+#map{flex:1;min-height:420px}
+.legend{background:#fff;padding:10px 12px;border-radius:4px;box-shadow:0 1px 4px rgba(0,0,0,.25);font-size:12.5px;line-height:1.4;min-width:170px}
+.legend h3{margin:0 0 6px;font-size:13px} .legend div{display:flex;align-items:center;gap:8px;margin:3px 0}
+.legend i{width:16px;height:12px;border-radius:2px;display:inline-block;border:1px solid rgba(0,0,0,.25)}
+.legend small{display:block;color:#5d666d;margin-top:6px}
+.popup b{font-size:13px} .popup table{border-collapse:collapse;margin-top:6px;font-size:12px}
+.popup figure{margin:8px 0 0} .popup img{display:block;width:300px;max-width:100%;height:auto;border:1px solid #d9ddd9;background:#e9ecea}
+.popup figcaption{font-size:11px;color:#5d666d;margin-top:3px;line-height:1.3}
+.vorschau{background:#fff;padding:10px 12px;border-radius:4px;box-shadow:0 1px 6px rgba(0,0,0,.3);width:min(326px,70vw);pointer-events:none}
+.vorschau[hidden]{display:none}
+.popup figure img{cursor:zoom-in}
+.gross{position:fixed;inset:0;z-index:2000;background:rgba(12,14,16,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px 16px 16px;gap:10px;cursor:zoom-out}
+.gross[hidden]{display:none}
+.gross img{max-width:100%;max-height:calc(100% - 40px);object-fit:contain;background:#222;border-radius:4px}
+.gross p{color:#e6e9ea;font-size:13px;margin:0;text-align:center}
+.gross button{position:absolute;top:12px;right:12px;font:inherit;font-size:14px;background:#2b3237;color:#eef0f1;border:1px solid #4a535a;border-radius:6px;padding:7px 12px;cursor:pointer}
+.popup td{padding:2px 8px 2px 0} .popup td:last-child{text-align:right;font-family:Consolas,monospace}
+.badge{display:inline-block;padding:1px 7px;border-radius:3px;font-family:Consolas,monospace;font-size:12px}
+.seglabel{background:transparent;border:0;box-shadow:none;font-family:Consolas,monospace;font-weight:700;font-size:12px;color:#111;text-shadow:0 0 3px #fff,0 0 3px #fff}
+.seglabel::before{display:none}
+</style></head><body>
+<header><h1 id="titel"></h1><span id="info"></span></header>
+<div id="map"></div>
+<script>
+var DATEN = {"type": "FeatureCollection", "name": "Langenloiserstraße", "features": [{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[15.5878079, 48.4092353], [15.5877985, 48.4092288], [15.5877892, 48.4092223], [15.5877798, 48.4092158], [15.5877704, 48.4092093], [15.5877611, 48.4092028], [15.5877093, 48.4092358], [15.5877187, 48.4092423], [15.587728, 48.4092488], [15.5877374, 48.4092553], [15.5877468, 48.4092618], [15.5877561, 48.4092683], [15.5878079, 48.4092353]]]}, "properties": {"art": "abschnitt", "abschnitt": "01", "station_von_m": 4.0, "station_bis_m": 9.0, "foto": "IMG_1676", "aufnahme": "2026:10:01 13:06:36", "zustandsklasse": 2, "schadanteil_prozent": 11.4, "schadflaeche_m2": 3.08, "laengsrisse_m": 5.6, "querrisse_m": 0, "netzrisse_m2": 0.0, "flickstellen_m2": 0.0, "bezugsflaeche_m2": 26.967075}}, {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[15.5877611, 48.4092028], [15.5877495, 48.4091949], [15.5877393, 48.409189], [15.5877292, 48.409183], [15.587719, 48.4091771], [15.5877089, 48.4091712], [15.5876615, 48.4092069], [15.5876716, 48.4092129], [15.5876818, 48.4092188], [15.5876919, 48.4092248], [15.5877021, 48.4092307], [15.5877093, 48.4092358], [15.5877611, 48.4092028]]]}, "properties": {"art": "abschnitt", "abschnitt": "02", "station_von_m": 9.0, "station_bis_m": 14.0, "foto": "IMG_1677", "aufnahme": "2026:10:01 13:06:40", "zustandsklasse": 1, "schadanteil_prozent": 9.2, "schadflaeche_m2": 2.43, "laengsrisse_m": 4.0, "querrisse_m": 0, "netzrisse_m2": 0.0, "flickstellen_m2": 0.0, "bezugsflaeche_m2": 26.34485}}, {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[15.5877089, 48.4091712], [15.5876987, 48.4091652], [15.5876885, 48.4091593], [15.5876784, 48.4091533], [15.5876638, 48.4091458], [15.5876525, 48.4091409], [15.5876129, 48.4091806], [15.5876242, 48.4091856], [15.587631, 48.4091891], [15.5876411, 48.409195], [15.5876513, 48.409201], [15.5876615, 48.4092069], [15.5877089, 48.4091712]]]}, "properties": {"art": "abschnitt", "abschnitt": "03", "station_von_m": 14.0, "station_bis_m": 19.0, "foto": "IMG_1678", "aufnahme": "2026:10:01 13:06:45", "zustandsklasse": 2, "schadanteil_prozent": 15.8, "schadflaeche_m2": 4.18, "laengsrisse_m": 7.0, "querrisse_m": 0, "netzrisse_m2": 0.0, "flickstellen_m2": 0.0, "bezugsflaeche_m2": 26.41935}}, {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[15.5876525, 48.4091409], [15.5876412, 48.4091359], [15.5876299, 48.4091309], [15.5876186, 48.409126], [15.5876073, 48.409121], [15.5875961, 48.4091161], [15.5875565, 48.4091558], [15.5875678, 48.4091608], [15.5875791, 48.4091658], [15.5875904, 48.4091707], [15.5876016, 48.4091757], [15.5876129, 48.4091806], [15.5876525, 48.4091409]]]}, "properties": {"art": "abschnitt", "abschnitt": "04", "station_von_m": 19.0, "station_bis_m": 24.0, "foto": "IMG_1679", "aufnahme": "2026:10:01 13:06:49", "zustandsklasse": 2, "schadanteil_prozent": 13.8, "schadflaeche_m2": 3.84, "laengsrisse_m": 3.8, "querrisse_m": 2.4, "netzrisse_m2": 0.29, "flickstellen_m2": 0.0, "bezugsflaeche_m2": 27.796975}}, {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[15.5875961, 48.4091161], [15.5875848, 48.4091111], [15.5875735, 48.4091061], [15.5875572, 48.4091004], [15.587545, 48.4090965], [15.5875328, 48.4090926], [15.5875018, 48.4091356], [15.587514, 48.4091395], [15.5875262, 48.4091434], [15.5875339, 48.4091459], [15.5875452, 48.4091509], [15.5875565, 48.4091558], [15.5875961, 48.4091161]]]}, "properties": {"art": "abschnitt", "abschnitt": "05", "station_von_m": 24.0, "station_bis_m": 29.0, "foto": "IMG_1681", "aufnahme": "2026:10:01 13:07:06", "zustandsklasse": 1, "schadanteil_prozent": 4.4, "schadflaeche_m2": 0.79, "laengsrisse_m": 1.1, "querrisse_m": 0, "netzrisse_m2": 0.0, "flickstellen_m2": 0.0, "bezugsflaeche_m2": 17.7768}}, {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[15.5875328, 48.4090926], [15.5875206, 48.4090887], [15.5875084, 48.4090848], [15.5874962, 48.4090809], [15.5874818, 48.4090764], [15.5874692, 48.4090731], [15.5874426, 48.4091173], [15.5874552, 48.4091207], [15.5874652, 48.4091239], [15.5874774, 48.4091278], [15.5874896, 48.4091317], [15.5875018, 48.4091356], [15.5875328, 48.4090926]]]}, "properties": {"art": "abschnitt", "abschnitt": "06", "station_von_m": 29.0, "station_bis_m": 34.0, "foto": "IMG_1682", "aufnahme": "2026:10:01 13:07:12", "zustandsklasse": 1, "schadanteil_prozent": 7.0, "schadflaeche_m2": 1.35, "laengsrisse_m": 0, "querrisse_m": 2.0, "netzrisse_m2": 0.0, "flickstellen_m2": 0.0, "bezugsflaeche_m2": 19.20965}}, {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[15.5874692, 48.4090731], [15.5874567, 48.4090697], [15.5874441, 48.4090664], [15.5874315, 48.409063], [15.587419, 48.4090597], [15.587406, 48.4090563], [15.5873801, 48.4091008], [15.5873923, 48.409104], [15.5874049, 48.4091073], [15.5874175, 48.4091107], [15.58743, 48.409114], [15.5874426, 48.4091173], [15.5874692, 48.4090731]]]}, "properties": {"art": "abschnitt", "abschnitt": "07", "station_von_m": 34.0, "station_bis_m": 39.0, "foto": "IMG_1683", "aufnahme": "2026:10:01 13:07:17", "zustandsklasse": 1, "schadanteil_prozent": 0.0, "schadflaeche_m2": 0.0, "laengsrisse_m": 0, "querrisse_m": 0, "netzrisse_m2": 0.0, "flickstellen_m2": 0.0, "bezugsflaeche_m2": 9.9314}}, {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[15.587406, 48.4090563], [15.5873934, 48.4090531], [15.5873808, 48.4090498], [15.5873682, 48.4090466], [15.5873555, 48.4090433], [15.5873429, 48.4090401], [15.587317, 48.4090845], [15.5873296, 48.4090878], [15.5873422, 48.409091], [15.5873549, 48.4090943], [15.5873675, 48.4090975], [15.5873801, 48.4091008], [15.587406, 48.4090563]]]}, "properties": {"art": "abschnitt", "abschnitt": "08", "station_von_m": 39.0, "station_bis_m": 44.0, "foto": "IMG_1684", "aufnahme": "2026:10:01 13:07:22", "zustandsklasse": 1, "schadanteil_prozent": 0.0, "schadflaeche_m2": 0.0, "laengsrisse_m": 0, "querrisse_m": 0, "netzrisse_m2": 0.0, "flickstellen_m2": 0.0, "bezugsflaeche_m2": 2.5772}}, {"type": "Feature", "geometry": {"type": "Point", "coordinates": [15.5878194, 48.4092778]}, "properties": {"art": "foto", "foto": "IMG_1676"}}, {"type": "Feature", "geometry": {"type": "Point", "coordinates": [15.5877833, 48.4092528]}, "properties": {"art": "foto", "foto": "IMG_1677"}}, {"type": "Feature", "geometry": {"type": "Point", "coordinates": [15.5877278, 48.4092139]}, "properties": {"art": "foto", "foto": "IMG_1678"}}, {"type": "Feature", "geometry": {"type": "Point", "coordinates": [15.5876667, 48.4091722]}, "properties": {"art": "foto", "foto": "IMG_1679"}}, {"type": "Feature", "geometry": {"type": "Point", "coordinates": [15.5875361, 48.4091139]}, "properties": {"art": "foto", "foto": "IMG_1681"}}, {"type": "Feature", "geometry": {"type": "Point", "coordinates": [15.5874667, 48.4091]}, "properties": {"art": "foto", "foto": "IMG_1682"}}, {"type": "Feature", "geometry": {"type": "Point", "coordinates": [15.5874056, 48.4090806]}, "properties": {"art": "foto", "foto": "IMG_1683"}}, {"type": "Feature", "geometry": {"type": "Point", "coordinates": [15.5873361, 48.4090639]}, "properties": {"art": "foto", "foto": "IMG_1684"}}]};
+var FARBE={1:'#1b7f3b',2:'#7ccf4f',3:'#f2d23a',4:'#f08a24',5:'#e0312b'}, TEXT={1:'#fff',2:'#13240c',3:'#2b2400',4:'#2b1400',5:'#fff'};
+var NAME={1:'0–10 %',2:'10–20 %',3:'20–30 %',4:'30–40 %',5:'40 % und mehr'};
+var QUELLE='Datenquelle: <a href="https://basemap.at" target="_blank" rel="noopener">basemap.at</a>';
+function de(x,n){return Number(x).toLocaleString('de-AT',{minimumFractionDigits:n,maximumFractionDigits:n});}
+var basis='https://mapsneu.wien.gv.at/basemap/', opt={maxNativeZoom:20,maxZoom:22,attribution:QUELLE};
+var orthofoto=L.tileLayer(basis+'bmaporthofoto30cm/normal/google3857/{z}/{y}/{x}.jpeg',opt),
+    grundkarte=L.tileLayer(basis+'geolandbasemap/normal/google3857/{z}/{y}/{x}.png',opt),
+    grau=L.tileLayer(basis+'bmapgrau/normal/google3857/{z}/{y}/{x}.png',opt),
+    beschriftung=L.tileLayer(basis+'bmapoverlay/normal/google3857/{z}/{y}/{x}.png',opt);
+var map=L.map('map',{layers:[orthofoto]}); L.control.scale({imperial:false,maxWidth:160}).addTo(map);
+var vorschau=L.control({position:'bottomright'});
+vorschau.onAdd=function(){this.div=L.DomUtil.create('div','vorschau'); this.div.hidden=true; return this.div;};
+vorschau.zeige=function(h){this.div.innerHTML=h; this.div.hidden=false;};
+vorschau.verberge=function(){this.div.hidden=true;};
+vorschau.addTo(map);
+var abschnitte=L.geoJSON(DATEN,{filter:function(f){return f.properties.art==='abschnitt';},
+  style:function(f){return {color:'#fff',weight:1.5,fillColor:FARBE[f.properties.zustandsklasse],fillOpacity:0.72};},
+  onEachFeature:function(f,layer){var p=f.properties,k=p.zustandsklasse;
+    // Draufsicht der markierten Schäden + Werte: beim Darüberfahren im Vorschaufeld, beim Klick als Popup
+    var inhalt='<div class="popup"><b>Abschnitt '+p.abschnitt+' · Station '+p.station_von_m+'–'+p.station_bis_m+' m</b><br>'+
+      '<span class="badge" style="background:'+FARBE[k]+';color:'+TEXT[k]+'">Klasse '+k+' · '+de(p.schadanteil_prozent,1)+' %</span>'+
+      '<figure><img src="bilder/'+encodeURIComponent(p.foto)+'_draufsicht_klein.jpg" alt="Draufsicht mit markierten Schäden, '+p.foto+'">'+
+      '<figcaption>Draufsicht · Fahrtrichtung ↑ · rot Längs-, orange Querriss, dunkelrot Netzriss, blau Flickstelle, grau schraffiert Schatten<br><b>Bild antippen zum Vergrößern</b></figcaption></figure><table>'+
+      '<tr><td>Längsrisse</td><td>'+de(p.laengsrisse_m,1)+' m</td></tr><tr><td>Querrisse</td><td>'+de(p.querrisse_m,1)+' m</td></tr>'+
+      '<tr><td>Netzrisse</td><td>'+de(p.netzrisse_m2,2)+' m²</td></tr><tr><td>Flickstellen</td><td>'+de(p.flickstellen_m2,2)+' m²</td></tr>'+
+      '<tr><td>Schadfläche</td><td>'+de(p.schadflaeche_m2,2)+' m²</td></tr>'+
+      (p.schatten_m2 ? '<tr><td>Schatten (nicht ausgewertet)</td><td>'+de(p.schatten_m2,2)+' m²</td></tr>' : '')+
+      '<tr><td>Foto</td><td>'+p.foto+'</td></tr></table></div>';
+    layer.bindPopup(inhalt,{maxWidth:340,minWidth:300});
+    layer.bindTooltip(p.abschnitt,{permanent:true,direction:'center',className:'seglabel'});
+    layer.on('mouseover',function(){layer.setStyle({weight:3,color:'#111'}); vorschau.zeige(inhalt);});
+    layer.on('mouseout',function(){abschnitte.resetStyle(layer); vorschau.verberge();});}}).addTo(map);
+var fotos=L.geoJSON(DATEN,{filter:function(f){return f.properties.art==='foto';},
+  pointToLayer:function(f,ll){return L.circleMarker(ll,{radius:4,color:'#fff',weight:1.5,fillColor:'#1d2226',fillOpacity:1});},
+  onEachFeature:function(f,l){l.bindTooltip(f.properties.foto+' (GPS-Standort)');}});
+L.control.layers({'Luftbild (Orthofoto)':orthofoto,'Grundkarte':grundkarte,'Grundkarte grau':grau},
+  {'Zustandsklassen':abschnitte,'Fotostandorte':fotos,'Straßennamen':beschriftung},{collapsed:false}).addTo(map);
+var leg=L.control({position:'bottomleft'}); leg.onAdd=function(){var d=L.DomUtil.create('div','legend'),h='<h3>Zustandsklasse</h3>',a={};
+  DATEN.features.forEach(function(f){var k=f.properties.zustandsklasse; if(k) a[k]=(a[k]||0)+1;});
+  for(var k=1;k<=5;k++) h+='<div><i style="background:'+FARBE[k]+'"></i>'+k+' · '+NAME[k]+'<span style="margin-left:auto">'+(a[k]||0)+'</span></div>';
+  d.innerHTML=h+'<small>Schadanteil je Abschnitt, Projektvorgabe (keine RVS-Note)</small>'; return d;}; leg.addTo(map);
+document.getElementById('titel').textContent=DATEN.name;
+var n=DATEN.features.filter(function(f){return f.properties.art==='abschnitt';}).length;
+document.getElementById('info').textContent=n+' Abschnitte · Luftbild 29 cm (Detailgebiete 15 cm) · Datenquelle: basemap.at';
+// Vogelperspektive im Infofenster antippen: groß anzeigen (volle Auflösung, falls vorhanden)
+var gross=document.createElement('div'); gross.className='gross'; gross.hidden=true;
+gross.innerHTML='<button type="button">Schließen ✕</button><img alt=""><p></p>';
+document.body.appendChild(gross);
+function grossZeigen(src,titel){var im=gross.querySelector('img'), voll=src.replace('_draufsicht_klein.jpg','_draufsicht_markiert.jpg');
+  im.onerror=function(){im.onerror=null; if(im.getAttribute('src')!==src) im.src=src;};
+  im.src=voll; im.alt=titel; gross.querySelector('p').textContent=titel+' · Fahrtrichtung ↑ · zum Schließen antippen oder Esc'; gross.hidden=false;}
+gross.addEventListener('click',function(){gross.hidden=true;});
+document.addEventListener('keydown',function(e){if(e.key==='Escape') gross.hidden=true;});
+document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('.leaflet-popup .popup figure img');
+  if(b){e.preventDefault(); e.stopPropagation(); grossZeigen(b.getAttribute('src'),b.alt);}},true);
+map.fitBounds(abschnitte.getBounds(),{padding:[60,60],maxZoom:20});
+</script></body></html>
