@@ -9,6 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 os.environ.pop("ANTHROPIC_API_KEY", None)
+os.environ["ROADSENSE_ROLE"] = "test"
 
 from PIL import Image  # noqa: E402
 
@@ -109,10 +110,10 @@ class Upload(unittest.TestCase):
         self.assertIn("Fahrbahn", s["fehler"])
 
     def test_dateien_nur_vom_eigenen_auftrag(self):
-        for pfad in ("/api/auswertung/0000000000000000/Bericht.html", "/api/auswertung/../app.py",
-                     "/api/auswertung/zzzz/bilder/x.jpg", "/api/auswertung/0123456789abcdef/bilder/../../app.py"):
+        for pfad in ("/api/auswertung/00000000000000000000000000000000/Bericht.html", "/api/auswertung/../app.py",
+                     "/api/auswertung/zzzz/bilder/x.jpg", "/api/auswertung/0123456789abcdef0123456789abcdef/bilder/../../app.py"):
             self.assertIn(self.c.get(pfad).status_code, (404, 308))
-        self.assertIsNone(aw.datei_pfad("0123456789abcdef", "../app.py"))
+        self.assertIsNone(aw.datei_pfad("0123456789abcdef0123456789abcdef", "../app.py"))
 
     def _warten(self, aid, sekunden=120):
         ende = time.time() + sekunden

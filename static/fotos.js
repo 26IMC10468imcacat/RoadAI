@@ -3,6 +3,75 @@
 (() => {
   "use strict";
   const MAX_KANTE = 4032;
+  const WORKER_KEY = "roadsense.auswerteLaptop.v1";
+  const TOKEN_HEADER = "X-RoadSense-Token";
+
+  // Verbindung zum Auswerte-Laptop. Adresse und Schlüssel liegen ausschließlich
+  // in localStorage dieses Browsers – niemals auf Render oder GitHub.
+  function workerKonfig() {
+    try {
+      const d = JSON.parse(localStorage.getItem(WORKER_KEY) || "null");
+      if (!d || typeof d.url !== "string" || typeof d.token !== "string") return null;
+      const u = new URL(d.url.trim());
+      if (u.protocol !== "https:" || !u.hostname.toLowerCase().endsWith(".ts.net") || u.username || u.password) return null;
+      if (u.pathname !== "/" || u.search || u.hash) return null;
+      const token = d.token.trim();
+      if (token.length < 20) return null;
+      return { url: `https://${u.hostname}`, token };
+    } catch { return null; }
+  }
+  function workerSetzen(url, token) {
+    let u;
+    try { u = new URL(String(url || "").trim()); } catch { throw new Error("Bitte die https-Adresse des Auswerte-Laptops eingeben."); }
+    token = String(token || "").trim();
+    if (u.protocol !== "https:" || !u.hostname.toLowerCase().endsWith(".ts.net") || u.username || u.password || (u.pathname !== "/" && u.pathname !== "") || u.search || u.hash) {
+      throw new Error("Bitte die Tailscale-Adresse des Auswerte-Laptops eingeben (https://…ts.net).");
+    }
+    if (token.length < 20) throw new Error("Der lokale Verbindungsschlüssel ist ungültig.");
+    localStorage.setItem(WORKER_KEY, JSON.stringify({ url: `https://${u.hostname}`, token }));
+  }
+  function workerLoeschen() { localStorage.removeItem(WORKER_KEY); }
+  function workerKopf(k, json = false) {
+    return { ...(k ? { [TOKEN_HEADER]: k.token } : {}), ...(json ? { "Content-Type": "application/json" } : {}) };
+  }
+  async function workerJson(pfad, body) {
+    const k = workerKonfig();
+    if (!k) throw new Error("Auswerte-Laptop noch nicht verbunden.");
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), body === undefined ? 15000 : 120000);
+    let r;
+    try {
+      r = await fetch(k.url + pfad, {
+        method: body === undefined ? "GET" : "POST",
+        headers: workerKopf(k, body !== undefined),
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: ctl.signal,
+      });
+    } catch (e) {
+      if (e.name === "AbortError") throw new Error("Der Auswerte-Laptop antwortet nicht rechtzeitig.");
+      throw new Error("Auswerte-Laptop nicht erreichbar. Läuft Auswerte_Laptop_starten.bat?");
+    } finally { clearTimeout(timer); }
+    let d = null;
+    try { d = await r.json(); } catch { /* unten */ }
+    if (!r.ok || !d?.ok) throw new Error(d?.fehler || `Auswerte-Laptop antwortet mit HTTP ${r.status}.`);
+    return d;
+  }
+  async function workerStatus() {
+    const k = workerKonfig();
+    if (!k) return { verbunden: false, erreichbar: false, ki: false, zapier: false, hinweis: "Auswerte-Laptop einmal mit diesem Browser verbinden." };
+    try {
+      const d = await workerJson("/api/worker-check");
+      return {
+        verbunden: true, erreichbar: !!d.auswertung, ki: !!d.ki, zapier: !!d.zapier, modell: d.modell || null,
+        max_fotos: d.max_fotos, hinweis: d.auswertung ? "" : "Bildauswertung am Laptop nicht bereit."
+      };
+    } catch (e) { return { verbunden: true, erreichbar: false, ki: false, zapier: false, hinweis: e.message }; }
+  }
+  function ressource(pfad) {
+    if (!pfad || /^(?:https?:|data:|blob:)/i.test(pfad)) return pfad;
+    const k = workerKonfig();
+    return k && String(pfad).startsWith("/api/auswertung/") ? k.url + pfad : pfad;
+  }
 
   // ---------- EXIF aus JPEG lesen (Zeit, GPS, Brennweite, Modell) ----------
   function liesExif(buf) {
@@ -234,12 +303,15 @@
   // ---------- Hochladen mit Fortschritt ----------
   function hochladen(fotos, felder, fortschritt) {
     return new Promise((res, rej) => {
+      const k = workerKonfig();
+      if (!k) return rej(new Error("Auswerte-Laptop noch nicht verbunden. Bitte zuerst die lokale Verbindung speichern."));
       const fd = new FormData();
-      Object.entries(felder).forEach(([k, v]) => fd.append(k, v ?? ""));
+      Object.entries(felder).forEach(([name, v]) => fd.append(name, v ?? ""));
       fd.append("meta", JSON.stringify(fotos.map((f) => f.meta)));
       fotos.forEach((f) => fd.append("fotos", f.upload, f.name));
       const xhr = new XMLHttpRequest();
-      xhr.open("POST", "/api/auswertung");
+      xhr.open("POST", k.url + "/api/auswertung");
+      xhr.setRequestHeader(TOKEN_HEADER, k.token);
       xhr.timeout = 10 * 60 * 1000;
       xhr.upload.onprogress = (e) => e.lengthComputable && fortschritt(e.loaded / e.total);
       xhr.onload = () => {
@@ -248,7 +320,7 @@
         if (xhr.status === 200 && d?.ok) res(d.auftrag);
         else rej(new Error(d?.fehler || `Hochladen fehlgeschlagen (HTTP ${xhr.status}).`));
       };
-      xhr.onerror = () => rej(new Error("Keine Verbindung. Sind Sie online?"));
+      xhr.onerror = () => rej(new Error("Auswerte-Laptop nicht erreichbar. Sind beide schwarzen Fenster offen?"));
       xhr.ontimeout = () => rej(new Error("Das Hochladen hat zu lange gedauert. Bitte im WLAN erneut versuchen."));
       xhr.send(fd);
     });
@@ -257,6 +329,7 @@
   window.RoadAIFotos = {
     uebernehmen, hochladen, gpsStarten, gpsStoppen, liesExif, qualitaet,
     position, abstand, signal, signalVorbereiten, wachHalten,
+    workerKonfig, workerSetzen, workerLoeschen, workerStatus, workerJson, ressource,
     gpsFehler: () => gpsFehler,
   };
 })();

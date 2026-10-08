@@ -44,7 +44,7 @@ AUFBEWAHRUNG = 24 * 3600      # s, danach werden Bericht und Bilder gelöscht
 MAX_AUFTRAEGE = 30
 
 ENDUNGEN = (".jpg", ".jpeg", ".png", ".heic", ".heif")
-_ID = re.compile(r"[0-9a-f]{16}")
+_ID = re.compile(r"[0-9a-f]{32}")
 
 
 class UploadFehler(core.DatenFehler):
@@ -236,7 +236,7 @@ def ergebnis_zu_strecke(daten: dict, auftrag_id: str, *, name: str, ort: str, qu
 
 class Auftrag:
     def __init__(self, name: str, ort: str, breite: float | None, anzahl: int):
-        self.id = uuid.uuid4().hex[:16]
+        self.id = uuid.uuid4().hex
         self.name, self.ort, self.breite = name, ort, breite
         self.status = "wartet"          # wartet | laeuft | fertig | fehler
         self.phase = "In der Warteschlange"

@@ -3,24 +3,15 @@ services:
     name: roadai
     runtime: python
     region: frankfurt
-    # Die Fotos rechnet der Auswerte-Laptop (AUSWERTUNG_URL), daher reicht der Gratis-Plan.
-    # Ohne Laptop braucht die Auswertung "standard" (2 GB).
     plan: free
-    buildCommand: pip install -r requirements.txt
+    # Render hostet nur die Web-Oberfläche und die Beispielstrecken.
+    # Fotoauswertung, Claude und Zapier laufen direkt auf dem lokalen Auswerte-Laptop.
+    # Auf Render werden dafür KEINE persönlichen Schlüssel/Token benötigt.
+    buildCommand: pip install -r requirements-render.txt
     startCommand: gunicorn app:app --workers 1 --threads 4 --timeout 300 --bind 0.0.0.0:$PORT
     healthCheckPath: /api/status
     envVars:
-      - key: ANTHROPIC_API_KEY
-        sync: false
-      - key: ZAPIER_WEBHOOK_URL
-        sync: false
-      - key: AUSWERTUNG_URL
-        sync: false
-      - key: AUSWERTUNG_TOKEN
-        sync: false
-      - key: CLAUDE_MODEL
-        value: claude-sonnet-5-5
-      - key: SECRET_KEY
-        generateValue: true
+      - key: ROADSENSE_ROLE
+        value: web
       - key: PYTHON_VERSION
         value: 3.12.7

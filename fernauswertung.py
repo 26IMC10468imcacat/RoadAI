@@ -1,9 +1,8 @@
-"""Weiterleitung der Fotoauswertung an einen Auswerte-Laptop.
+"""Legacy-Fallback für serverseitige Weiterleitung an einen Auswerte-Laptop.
 
-Die Webseite (z. B. Render, Gratis-Plan) hat zu wenig Speicher für die Bildauswertung.
-Ist AUSWERTUNG_URL gesetzt, schickt sie Fotos, Statusabfragen und Ergebnisbilder an den Laptop
-(z. B. https://laptop.xyz.ts.net über Tailscale Funnel) und reicht die Antworten an das Handy durch.
-Beide Seiten kennen denselben geheimen Schlüssel AUSWERTUNG_TOKEN.
+RoadSense v4 verwendet auf Render standardmäßig NICHT mehr diese Weiterleitung: Der Browser
+spricht den lokalen Laptop direkt per Tailscale an, sodass keine persönlichen Schlüssel auf
+Render liegen. Diese Klasse bleibt nur für lokale/ältere Setups im Code.
 """
 from __future__ import annotations
 
@@ -16,7 +15,7 @@ import requests
 from flask import Response, jsonify
 
 KOPF = "X-RoadSense-Token"
-_ID = re.compile(r"/api/auswertung/[0-9a-f]{16}(/(Bericht\.html|Karte\.html|bilder/[A-Za-z0-9_.-]{1,80}\.jpg))?")
+_ID = re.compile(r"/api/auswertung/(?:[0-9a-f]{16}|[0-9a-f]{32})(/(Bericht\.html|Karte\.html|bilder/[A-Za-z0-9_.-]{1,80}\.jpg))?")
 _DURCHREICHEN = ("Content-Type", "Cache-Control")
 
 

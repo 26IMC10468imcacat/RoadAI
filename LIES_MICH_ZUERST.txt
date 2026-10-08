@@ -1,108 +1,106 @@
-RoadSense Web-App: Übergabe
-============================
+RoadSense v4 – lokale Schlüssel, Render bleibt leicht
+=====================================================
 
-Was ist das?
-------------
-Die mobile Webseite von RoadSense. Man kann damit
-  - mit dem Handy eine Straße fotografieren oder Fotos aus der Galerie wählen,
-  - die Fotos automatisch auswerten lassen (Programm auswertung/Lebende_Strasse.py),
-  - das Ergebnis mit Karte, Fotos und Draufsichten ansehen,
-  - eine KI-Bewertung bekommen, das Ergebnis in Google Sheets eintragen und Fragen an den Assistenten stellen.
-Zum Ansehen gibt es die zwei echten Teststrecken (Teststrecke 01 und 02, Langenlois).
+DIE WICHTIGSTE REGEL
+--------------------
+Echte Schlüssel liegen nur lokal auf deinem PC:
 
+  %LOCALAPPDATA%\RoadSense\.env
 
-Empfohlen: Webseite auf Render + ein Laptop rechnet die Fotos
--------------------------------------------------------------
-Die Webseite läuft dauerhaft und kostenlos auf Render (Gratis-Plan). Für die Fotoauswertung
-reicht dort der Speicher nicht, deshalb schickt Render die Fotos an EINEN Laptop, der sie
-berechnet und das Ergebnis zurückgibt. Ist der Laptop aus, funktioniert alles außer
-"Fotos auswerten"; die Seite zeigt dann einen Hinweis.
+Diese Datei liegt AUSSERHALB des GitHub-Ordners.
+Sie wird bei GitHub-Desktop-Updates nicht gelöscht oder ersetzt.
+Sie wird NICHT auf GitHub und NICHT auf Render gespeichert.
 
-Einmalig auf dem Laptop:
-  1. Diese ZIP entpacken (Rechtsklick -> "Alle extrahieren").
-  2. Doppelklick auf "Auswerte_Laptop_starten.bat".
-     Beim ersten Mal wird Tailscale installiert. Danach rechts unten im Infobereich auf das
-     Tailscale-Symbol klicken, "Log in" und mit dem Google-Konto anmelden.
-  3. "Auswerte_Laptop_starten.bat" erneut starten. Beim allerersten Mal erscheint ein Link,
-     um "Funnel" freizuschalten: öffnen, bestätigen, die .bat noch einmal starten.
-  4. Im Fenster stehen jetzt
-       - der Schlüssel (AUSWERTUNG_TOKEN) und
-       - die feste Adresse des Laptops, z. B. https://laptop-name.tail1234.ts.net
-  5. Energieoptionen: Am Netzteil "Energiesparmodus: Nie" einstellen.
-
-Einmalig auf Render (Dashboard -> euer Dienst -> Environment -> Add Environment Variable):
-  AUSWERTUNG_URL    = die feste Adresse des Laptops
-  AUSWERTUNG_TOKEN  = der Schlüssel aus dem Laptop-Fenster
-  Speichern. Render startet neu. Instance Type darf "Free" bleiben.
-
-Jedes Mal, wenn ausgewertet werden soll:
-  Doppelklick auf "Auswerte_Laptop_starten.bat" und beide Fenster offen lassen.
-  Fotos aufnehmen und auswerten geht dann ganz normal über die Render-Adresse.
-
-Hinweise:
-  - Der Schlüssel sorgt dafür, dass nur eure Render-Seite den Laptop rechnen lassen kann.
-    Er steht in der Datei .env auf dem Laptop. Nicht weitergeben, nicht auf GitHub hochladen.
-  - Fotos liegen nur vorübergehend auf dem Laptop (Temp-Ordner) und werden automatisch aufgeräumt.
-  - Render (Gratis) schläft nach 15 Minuten ohne Besuch ein; der erste Aufruf dauert dann ca. 1 Minute.
+Darin können liegen:
+  ANTHROPIC_API_KEY
+  ZAPIER_WEBHOOK_URL
+  AUSWERTUNG_TOKEN
+  SECRET_KEY
 
 
-Alternative: alles auf einem PC (ohne Render)
-------------------------------------------
-Voraussetzung: Windows-PC mit Python (Befehl "py") und Internet.
-Der PC muss laufen, solange die Seite erreichbar sein soll.
+ARCHITEKTUR
+-----------
+Render hostet nur die RoadSense-Webseite und die Beispielstrecken.
 
-Einmalig:
-  1. Die ZIP mit Rechtsklick -> "Alle extrahieren" entpacken.
-  2. Im entpackten Ordner die Datei ".env.example" kopieren und die Kopie ".env" nennen.
-     Mit dem Editor öffnen und den eigenen Claude-API-Schlüssel hinter ANTHROPIC_API_KEY= eintragen.
-     (Optional: Zapier-Adresse hinter ZAPIER_WEBHOOK_URL=.)
-     Die Datei .env nie weitergeben.
+  Browser
+     |-- normale Webseite --> Render
+     |
+     `-- Fotos / Claude / Zapier --> direkt per HTTPS/Tailscale --> dein Auswerte-Laptop
 
-Jedes Mal:
-  3. Doppelklick auf "1_App_starten.bat"   -> Fenster offen lassen.
-     Test am PC: http://localhost:8000
-  4. Doppelklick auf "2_Tunnel_starten.bat" -> Fenster offen lassen.
-     Beim ersten Mal wird nur "cloudflared" installiert; danach die Datei noch einmal starten.
-     Es erscheint eine Adresse wie https://irgendwas.trycloudflare.com -> am Handy öffnen.
-     Die Adresse ändert sich bei jedem Neustart des Tunnels.
-
-Falls Windows die .bat-Dateien blockiert ("Intelligente App-Steuerung"):
-Im entpackten Ordner oben in die Adresszeile "cmd" tippen, Enter, und eingeben:
-     py -m pip install flask requests numpy opencv-python pillow
-     py app.py
-In einem zweiten cmd-Fenster:
-     winget install --id Cloudflare.cloudflared
-     cloudflared tunnel --url http://localhost:8000
+Dadurch:
+  - bleibt Render Free klein und RAM-schonend,
+  - landen die großen Fotos nicht mehr zur Auswertung auf Render,
+  - braucht Render keinen Claude-Key und keinen Verbindungsschlüssel,
+  - bleibt die Bildauswertung auf deinem Laptop.
 
 
-Am Handy
---------
-"Neue Strecke aufnehmen" -> Name und Ort eintragen -> "Geführte Aufnahme starten"
-(Kamera mit Assistent: zeigt den Abstand zum letzten Foto, Signal bei 5 m,
-prüft jedes Foto auf Schärfe und Licht) oder "Fotos aus Galerie wählen". Etwa alle 5 m ein Foto, in Fahrtrichtung,
-beide Fahrbahnränder im Bild, 2 bis 25 Fotos. Standortabfrage erlauben.
-Dann "Fotos auswerten". Dauer etwa 10-20 Sekunden pro Foto.
+ERSTER START NACH DEM UPDATE
+----------------------------
+1. Auswerte_Laptop_starten.bat doppelklicken.
+2. Falls im aktuellen Projektordner noch eine alte .env liegt, wird sie automatisch
+   nach %LOCALAPPDATA%\RoadSense\.env übernommen und anschließend aus dem
+   GitHub-Ordner entfernt.
+3. Zwei schwarze Fenster offen lassen:
+     - RoadSense lokal auf Port 8000
+     - Tailscale Funnel
+4. Das Startfenster zeigt:
+     - die feste Tailscale-Adresse, z. B. https://christian-yoga....ts.net
+     - den lokalen AUSWERTUNG_TOKEN
+5. In der ONLINE-App einmal "Neue Strecke" öffnen und dort unter
+   "Auswerte-Laptop verbinden" Adresse + Token eintragen.
+   Beides wird nur im localStorage dieses Browsers gespeichert.
+
+Danach reicht bei jedem Windows-Neustart wieder:
+  Doppelklick auf Auswerte_Laptop_starten.bat
+
+Die Browser-Verbindung bleibt normalerweise gespeichert.
 
 
-Alternative: dauerhaft online über Render
------------------------------------------
-Siehe README.md, Abschnitt "Online stellen". Achtung: Für die Fotoauswertung braucht es
-den Render-Plan "Standard" (2 GB). Mit "Free" läuft die Seite, aber das Auswerten scheitert am Speicher.
+RENDER – EINMALIG ALTE SCHLÜSSEL ENTFERNEN
+-------------------------------------------
+Nach dem Deploy dieser Version bei Render unter Environment alte persönliche
+Werte löschen, falls sie noch vorhanden sind:
+
+  ANTHROPIC_API_KEY
+  ZAPIER_WEBHOOK_URL
+  AUSWERTUNG_URL
+  AUSWERTUNG_TOKEN
+  CLAUDE_MODEL
+
+Die neue Version braucht diese Werte auf Render NICHT mehr.
+ROADSENSE_ROLE=web kommt aus render.yaml.
 
 
-Neue Version des Auswerteprogramms
-----------------------------------
-Die neue Lebende_Strasse.py in den Ordner "auswertung" kopieren (alte ersetzen)
-und 1_App_starten.bat neu starten. Sonst muss nichts geändert werden.
+CLAUDE-KEY LOKAL EINTRAGEN
+--------------------------
+Doppelklick auf:
+  Lokale_Einstellungen_oeffnen.bat
+
+Dann in der lokalen Datei eintragen:
+  ANTHROPIC_API_KEY=...
+
+Speichern und Auswerte_Laptop_starten.bat neu starten.
+Der Claude-Key wird nicht in GitHub oder Render gespeichert.
 
 
-Ordner
-------
-  app.py, roadai_core.py, auswertung_server.py   Server der Web-App
-  fernauswertung.py                              Weiterleitung der Fotos an den Auswerte-Laptop
-  Auswerte_Laptop_starten.bat                    startet den Auswerte-Laptop (App + Tailscale Funnel)
-  auswertung/Lebende_Strasse.py                  das Auswerteprogramm
-  static/                                         die Webseite (Handy-Oberfläche)
-  data/                                           Teststrecke 01 und 02
-  tests/                                          automatische Crash-Tests (py -m unittest discover -s tests)
-  README.md                                       ausführliche Anleitung (Zapier, Render, Crash Test)
+NEUE VERSIONEN / LOOP
+---------------------
+Bei zukünftigen RoadSense-Versionen nur die Programmdateien im lokalen
+GitHub-Ordner ersetzen -> GitHub Desktop -> Commit -> Push.
+
+Die lokale Datei
+  %LOCALAPPDATA%\RoadSense\.env
+liegt außerhalb des Repositories und bleibt daher unangetastet.
+
+Neue ausgewertete Strecken werden weiterhin im Browser unter
+"Oder eine ausgewertete Strecke ansehen" gespeichert (max. 20 pro Browser).
+
+
+SICHERHEIT
+----------
+Der lokale Auswerte-Laptop akzeptiert rechenintensive API-Aufrufe nur mit dem
+lokalen Verbindungstoken. Der Browser sendet diesen Token direkt per HTTPS an
+den Tailscale-Funnel. Render erhält ihn nicht.
+
+Ergebnisbilder und Berichte werden über eine zufällige 128-Bit-Auftrags-ID
+abgerufen und nach der vorgesehenen Aufbewahrungszeit wieder gelöscht.

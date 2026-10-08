@@ -1,4 +1,7 @@
 __pycache__/
 *.pyc
 .env
+.env.*
+*.env
 .venv/
+RoadSense_local/

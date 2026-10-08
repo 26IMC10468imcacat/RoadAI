@@ -32,6 +32,7 @@
   const datum = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleDateString("de-AT", { day: "2-digit", month: "2-digit", year: "numeric" }); };
   const karte = (a) => (a.lat != null && a.lon != null ? `https://www.google.com/maps?q=${a.lat.toFixed(6)},${a.lon.toFixed(6)}` : "");
   const abschnitt = (n) => zustand.strecke.abschnitte.find((a) => a.nr === n);
+  const ress = (pfad) => window.RoadAIFotos?.ressource(pfad) || pfad;
 
   function toast(text) {
     const t = $("#toast");
@@ -145,9 +146,10 @@
     const s = zustand.status;
     if (!s) return;
     if (s.vorschau) { $("#status").innerHTML = ""; return; }
+    const laptop = s.worker?.erreichbar;
     $("#status").innerHTML =
-      `<span class="pille ${s.ki ? "an" : "aus"}">${s.ki ? "KI aktiv" : "Offline-Modus"}</span>` +
-      `<span class="pille ${s.zapier ? "an" : "aus"}">${s.zapier ? "Sheets verbunden" : "Sheets aus"}</span>`;
+      `<span class="pille ${laptop ? "an" : "aus"}">${laptop ? "Auswerte-Laptop verbunden" : "Auswerte-Laptop aus"}</span>` +
+      `<span class="pille ${s.ki ? "an" : "aus"}">${s.ki ? "KI lokal aktiv" : "KI lokal aus"}</span>`;
   }
 
   // ---------- Ansicht: Start (Module) ----------
@@ -264,13 +266,23 @@
         <button type="button" class="weg" data-aktion="foto-weg" data-id="${f.id}" aria-label="Foto ${i + 1} entfernen">×</button>
       </figure>`).join("");
     const nichtBereit = st.auswertung === false;
+    const wk = F().workerKonfig();
+    const verbindung = wk && st.worker?.erreichbar
+      ? `<section class="karte"><div class="eyebrow">Auswerte-Laptop</div><p><b>Verbunden</b> · ${esc(wk.url)}</p><button class="knopf zweit kompakt" type="button" data-aktion="auswerter-trennen">Verbindung ändern</button></section>`
+      : `<section class="karte felder"><div class="eyebrow">Auswerte-Laptop verbinden</div>
+          <p class="klein">Adresse und Schlüssel werden nur in diesem Browser gespeichert – nicht auf Render und nicht auf GitHub.</p>
+          <label>Tailscale-Adresse<input id="worker-url" value="${esc(wk?.url || "")}" placeholder="https://christian-yoga....ts.net"></label>
+          <label>Lokaler Verbindungsschlüssel<input id="worker-token" type="password" value="${esc(wk?.token || "")}" autocomplete="off" placeholder="Schlüssel aus dem schwarzen Fenster"></label>
+          <button class="knopf zweit" type="button" data-aktion="auswerter-speichern">Verbindung speichern und prüfen</button>
+        </section>`;
     return `
       <section>
         <div class="eyebrow">Neue Strecke</div>
         <h1>Strecke fotografieren</h1>
         <p class="lead" style="margin-top:8px">Etwa alle 5 m ein Foto in Fahrtrichtung, Kamera auf Augenhöhe, beide Fahrbahnränder im Bild.</p>
       </section>
-      ${nichtBereit ? `<p class="hinweis">${esc(st.auswertung_hinweis || "Die Bildauswertung ist auf diesem Server noch nicht eingerichtet.")}</p>` : ""}
+      ${verbindung}
+      ${nichtBereit ? `<p class="hinweis">${esc(st.auswertung_hinweis || "Der Auswerte-Laptop ist nicht bereit.")}</p>` : ""}
       ${A.fehler ? `<p class="hinweis fehler" role="alert">${esc(A.fehler)}</p>` : ""}
       <section class="karte felder">
         <label>Name der Strecke<input id="a-name" maxlength="60" value="${esc(A.name)}" placeholder="z. B. Kremser Straße"></label>
@@ -483,7 +495,7 @@
     if (!id) return;
     clearTimeout(verfolgen.timer);
     try {
-      const d = await api(`/api/auswertung/${encodeURIComponent(id)}`);
+      const d = await F().workerJson(`/api/auswertung/${encodeURIComponent(id)}`);
       A.auftrag = d.auftrag;
       if (d.auftrag.status === "fertig") {
         A.fotos.forEach((f) => f.vorschau && URL.revokeObjectURL(f.vorschau));
@@ -539,8 +551,8 @@
           <div><dt>Foto</dt><dd>${esc(a.foto || "–")}</dd></div>
         </dl>
         ${a.bild || a.foto_bild ? `<div class="bilder">
-          ${a.foto_bild ? `<figure><img src="${esc(a.foto_bild)}" alt="Foto ${esc(a.foto)} mit Auswertefläche" loading="lazy"><figcaption class="klein">Foto mit Auswertefläche</figcaption></figure>` : ""}
-          ${a.bild ? `<figure><img src="${esc(a.bild)}" alt="Draufsicht Abschnitt ${nr2(a.nr)} mit markierten Schäden" loading="lazy"><figcaption class="klein">Draufsicht, Schäden markiert</figcaption></figure>` : ""}
+          ${a.foto_bild ? `<figure><img src="${esc(ress(a.foto_bild))}" alt="Foto ${esc(a.foto)} mit Auswertefläche" loading="lazy"><figcaption class="klein">Foto mit Auswertefläche</figcaption></figure>` : ""}
+          ${a.bild ? `<figure><img src="${esc(ress(a.bild))}" alt="Draufsicht Abschnitt ${nr2(a.nr)} mit markierten Schäden" loading="lazy"><figcaption class="klein">Draufsicht, Schäden markiert</figcaption></figure>` : ""}
         </div>` : ""}
         ${a.hinweis ? `<p class="klein" style="padding:0 14px 8px">${esc(a.hinweis)}</p>` : ""}
         ${link ? `<div class="links"><a href="${link}" target="_blank" rel="noopener">In Google Maps öffnen ↗</a></div>` : ""}
@@ -555,7 +567,7 @@
         ${s.simuliert ? `<span class="marke-sim">Simulierte Daten</span>` : `<div class="eyebrow">Auswertung</div>`}
         <h1>${esc(s.name)}</h1>
         <p class="klein">${esc([s.ort, datum(s.aufnahme), `Fahrbahn ${zahl(s.fahrbahnbreite_m, 2)} m`].filter(Boolean).join(" · "))}</p>
-        ${s.bericht ? `<a class="klein" href="${esc(s.bericht)}" target="_blank" rel="noopener">Ausführlichen Prüfbericht mit allen Bildern öffnen ↗</a>` : ""}
+        ${s.bericht ? `<a class="klein" href="${esc(ress(s.bericht))}" target="_blank" rel="noopener">Ausführlichen Prüfbericht mit allen Bildern öffnen ↗</a>` : ""}
       </section>
       ${s.nicht_ausgewertet?.length ? `<p class="hinweis">${s.nicht_ausgewertet.length} Foto(s) konnten nicht ausgewertet werden: ${esc(s.nicht_ausgewertet.map((x) => x.foto).join(", "))}</p>` : ""}
       <div class="kpis">
@@ -572,10 +584,10 @@
       ${s.karte ? `<section class="karte">
         <h3>Karte</h3>
         <div class="kartenbox" id="kartenbox">
-          <iframe class="kartenrahmen" src="${esc(s.karte)}" title="Luftbildkarte mit Zustandsklassen je Abschnitt" loading="lazy"></iframe>
+          <iframe class="kartenrahmen" src="${esc(ress(s.karte))}" title="Luftbildkarte mit Zustandsklassen je Abschnitt" loading="lazy"></iframe>
           <button class="vollbild-knopf" type="button" data-aktion="karte-vollbild" aria-expanded="false">⤢ Vollbild</button>
         </div>
-        ${s.karte.startsWith("data:") ? "" : `<a class="klein" href="${esc(s.karte)}" target="_blank" rel="noopener">Karte in neuem Tab öffnen ↗</a>`}
+        ${s.karte.startsWith("data:") ? "" : `<a class="klein" href="${esc(ress(s.karte))}" target="_blank" rel="noopener">Karte in neuem Tab öffnen ↗</a>`}
       </section>` : ""}
       <button class="knopf akzent" type="button" data-aktion="bewerten" ${zustand.beschaeftigt ? "disabled" : ""}>
         ${zustand.beschaeftigt ? `<span class="spinner"></span>RoadSense bewertet …` : zustand.entscheidung ? "Bewertung ansehen" : "KI-Bewertung starten"}
@@ -628,7 +640,7 @@
     const ergebnis = zustand.zapier[e.entscheidung_id];
     let info = "";
     if (ergebnis) info = `<p class="${ergebnis.ok ? "ok" : "err"}">${esc(ergebnis.meldung)}</p>`;
-    else if (!s.zapier) info = `<p class="klein">Zapier ist am Server noch nicht eingerichtet. Siehe Anleitung (ZAPIER_WEBHOOK_URL).</p>`;
+    else if (!s.zapier) info = `<p class="klein">Zapier ist am Auswerte-Laptop noch nicht eingerichtet. Die URL bleibt ausschließlich in den lokalen Einstellungen.</p>`;
     return `<section class="karte zap">
       <h3>${esc(text)}</h3>
       <p class="klein">Überträgt Strecke, Kennzahlen und diese Bewertung als neue Zeile in Google Sheets.</p>
@@ -790,7 +802,7 @@ Mit freundlichen Grüßen`;
     zustand.beschaeftigt = "bewerten";
     render();
     try {
-      const d = await api("/api/entscheidung", { strecke: zustand.strecke });
+      const d = await F().workerJson("/api/entscheidung", { strecke: zustand.strecke });
       zustand.entscheidung = d.entscheidung;
       zustand.verlauf = [];
       zustand.beschaeftigt = false;
@@ -808,7 +820,7 @@ Mit freundlichen Grüßen`;
     zustand.beschaeftigt = "zapier";
     render();
     try {
-      const d = await api("/api/zapier", { strecke: zustand.strecke, entscheidung: e });
+      const d = await F().workerJson("/api/zapier", { strecke: zustand.strecke, entscheidung: e });
       zustand.zapier[e.entscheidung_id] = { ok: true, meldung: d.meldung };
     } catch (err) {
       zustand.zapier[e.entscheidung_id] = { ok: false, meldung: err.message };
@@ -825,7 +837,7 @@ Mit freundlichen Grüßen`;
     zustand.beschaeftigt = "chat";
     render();
     try {
-      const d = await api("/api/chat", {
+      const d = await F().workerJson("/api/chat", {
         strecke: zustand.strecke,
         entscheidung: zustand.entscheidung,
         verlauf: zustand.verlauf.map(({ role, content }) => ({ role, content })),
@@ -916,6 +928,14 @@ Mit freundlichen Grüßen`;
     else if (aktion === "foto-ersetzen") { zustand.aufnahme.ersetzen = el.dataset.id; F().gpsStarten(aktualisiereAssistent); $("#kamera").click(); }
     else if (aktion === "kamera") { felderMerken(); window.RoadAIFotos.gpsStarten(); $("#kamera").click(); }
     else if (aktion === "galerie") { felderMerken(); $("#galerie").click(); }
+    else if (aktion === "auswerter-speichern") {
+      try {
+        F().workerSetzen($("#worker-url")?.value, $("#worker-token")?.value);
+        toast("Lokale Verbindung gespeichert.");
+        statusLaden();
+      } catch (e) { toast(e.message); }
+    }
+    else if (aktion === "auswerter-trennen") { F().workerLoeschen(); statusLaden(); render(); }
     else if (aktion === "auswerten") auswertungStarten();
     else if (aktion === "foto-weg") {
       felderMerken();
@@ -953,7 +973,15 @@ Mit freundlichen Grüßen`;
     verfolgen(zustand.weiterVerfolgen);
   }
   function statusLaden() {
-    api("/api/status").then((s) => {
+    Promise.all([api("/api/status"), F().workerStatus()]).then(([s, worker]) => {
+      s.worker = worker;
+      s.auswertung = !!worker.erreichbar;
+      s.auswertung_hinweis = worker.erreichbar ? null : worker.hinweis;
+      // Persönliche Schlüssel bleiben lokal; KI- und Zapier-Status kommen vom Laptop.
+      s.ki = !!worker.ki;
+      s.zapier = !!worker.zapier;
+      s.modell = worker.modell || null;
+      if (Number.isFinite(worker.max_fotos)) s.max_fotos = worker.max_fotos;
       zustand.status = s; renderStatus();
       if (zustand.ansicht === "ergebnis" || (zustand.ansicht === "aufnahme" && !zustand.aufnahme.gefuehrt)) render();
     }).catch(() => {});

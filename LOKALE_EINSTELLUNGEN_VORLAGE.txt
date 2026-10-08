@@ -1,0 +1,16 @@
+RoadSense – Vorlage für lokale Einstellungen
+============================================
+
+Die echte Datei wird automatisch NUR auf diesem PC angelegt unter:
+  %LOCALAPPDATA%\RoadSense\.env
+
+Sie gehört NICHT in den GitHub-Ordner und NICHT zu Render.
+Zum Bearbeiten einfach "Lokale_Einstellungen_oeffnen.bat" starten.
+
+Mögliche Einträge:
+ANTHROPIC_API_KEY=
+ZAPIER_WEBHOOK_URL=
+CLAUDE_MODEL=claude-sonnet-5-5
+AUSWERTUNG_TOKEN=        (wird automatisch lokal erzeugt)
+SECRET_KEY=              (wird automatisch lokal erzeugt)
+ROADSENSE_WEB_ORIGIN=https://roadai-01hq.onrender.com

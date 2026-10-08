@@ -15,32 +15,29 @@ from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.exceptions import HTTPException
 
 import roadai_core as core
-import auswertung_server as aw
 import fernauswertung as fern
 import importlib.util
+import lokale_einstellungen as lokal_env
 
 BASIS = Path(__file__).resolve().parent
 
 
-def _env_datei_laden(pfad: Path) -> None:
-    """Liest Einstellungen aus der Datei .env (z. B. ANTHROPIC_API_KEY=...), falls vorhanden.
+ROLE = os.environ.get("ROADSENSE_ROLE", "local").strip().lower()
 
-    Werte, die schon in der Umgebung gesetzt sind (z. B. bei Render), haben Vorrang.
-    """
-    if not pfad.is_file():
-        return
-    for zeile in pfad.read_text(encoding="utf-8-sig").splitlines():
-        zeile = zeile.strip()
-        if not zeile or zeile.startswith("#") or "=" not in zeile:
-            continue
-        name, wert = zeile.split("=", 1)
-        name, wert = name.strip(), wert.strip().strip('"').strip("'")
-        if name and wert and not os.environ.get(name):
-            os.environ[name] = wert
+# Echte Schlüssel werden nur auf dem lokalen Auswerte-Laptop geladen.
+# ROLE=web (Render) und ROLE=test lesen niemals eine lokale .env-Datei.
+if ROLE == "local":
+    lokal_env.laden_umgebung()
 
-
-_env_datei_laden(BASIS / ".env")
 DATEN = BASIS / "data"
+if ROLE == "web":
+    aw = None
+    AUSWERTUNG_BEREIT = False
+    MAX_FOTOS = 80
+else:
+    import auswertung_server as aw
+    AUSWERTUNG_BEREIT = aw.PROGRAMM.is_file() and all(importlib.util.find_spec(m) for m in ("cv2", "numpy"))
+    MAX_FOTOS = aw.MAX_FOTOS
 
 BEISPIELE = {
     "TS01": ("teststrecke_01.json", "Auswertung vom 01.10.2026, 10 Fotos"),
@@ -50,16 +47,21 @@ BEISPIELE = {
 app = Flask(__name__, static_folder=None)
 app.config["MAX_CONTENT_LENGTH"] = 320_000_000  # nur für den Foto-Upload; JSON-Anfragen siehe unten
 JSON_MAX = 1_000_000  # 1 MB reicht für Hunderte Abschnitte
-AUSWERTUNG_BEREIT = aw.PROGRAMM.is_file() and all(importlib.util.find_spec(m) for m in ("cv2", "numpy"))
 app.json.ensure_ascii = False
 
 GEHEIM = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 
-# Rollen (siehe LIES_MICH_ZUERST.txt, Abschnitt "Render + Auswerte-Laptop"):
-#  - Webseite (Render): AUSWERTUNG_URL gesetzt  -> Fotos gehen an den Laptop weiter.
-#  - Auswerte-Laptop:   AUSWERTUNG_TOKEN gesetzt -> nimmt Auswertungen nur mit diesem Schlüssel an.
-FERN = fern.Fernauswertung(os.environ.get("AUSWERTUNG_URL", ""), os.environ.get("AUSWERTUNG_TOKEN", ""))
-LAPTOP_TOKEN = "" if FERN.aktiv else os.environ.get("AUSWERTUNG_TOKEN", "").strip()
+# Rollen:
+#  - Render (ROLE=web) hostet nur die Oberfläche und Beispiele. Dort werden KEINE
+#    persönlichen Schlüssel oder Verbindungstokens verwendet.
+#  - Der Auswerte-Laptop lädt seine Schlüssel ausschließlich aus der lokalen Datei
+#    %LOCALAPPDATA%\RoadSense\.env. Der Browser spricht ihn direkt via Tailscale Funnel an.
+# Die alte Server-Weiterleitung bleibt nur als technischer Fallback erhalten, ist auf Render aber deaktiviert.
+FERN = fern.Fernauswertung("", "") if ROLE != "local" else fern.Fernauswertung(
+    os.environ.get("AUSWERTUNG_URL", ""), os.environ.get("AUSWERTUNG_TOKEN", "")
+)
+LAPTOP_TOKEN = os.environ.get("AUSWERTUNG_TOKEN", "").strip() if ROLE == "local" else ""
+WEB_ORIGIN = os.environ.get("ROADSENSE_WEB_ORIGIN", "https://roadai-01hq.onrender.com").rstrip("/")
 ki = core.KiClient()
 
 
@@ -134,10 +136,29 @@ def statisch(datei):
 
 @app.before_request
 def laptop_schutz():
-    """Auf dem Auswerte-Laptop: Auswertungen nur für die eigene Webseite (gemeinsamer Schlüssel)."""
-    if LAPTOP_TOKEN and request.path.startswith("/api/auswertung"):
-        if not hmac.compare_digest(request.headers.get(fern.KOPF, ""), LAPTOP_TOKEN):
-            return fehler("Dieser Rechner wertet nur für die RoadSense-Webseite aus.", 403)
+    """Schützt den lokalen Auswerte-Laptop.
+
+    Der geheime Schlüssel liegt nur lokal und wird vom Browser direkt an den Laptop gesendet.
+    Render kennt ihn nicht. Lokale Zugriffe über localhost bleiben für Tests erlaubt.
+    """
+    if not LAPTOP_TOKEN or not request.path.startswith("/api/"):
+        return None
+    if request.method == "OPTIONS":
+        return ("", 204)
+    host = (request.host or "").split(":", 1)[0].lower()
+    if host in ("localhost", "127.0.0.1"):
+        return None
+    # Status darf ohne Schlüssel nur melden, ob der Rechner grundsätzlich lebt.
+    if request.path == "/api/status":
+        return None
+    # Ergebnisdateien besitzen eine zufällige Auftrags-ID und sind nur kurz verfügbar.
+    # Der Master-Schlüssel wird deshalb niemals in Bild-/Berichts-URLs geschrieben.
+    if request.method == "GET" and request.path.count("/") >= 4 and request.path.startswith("/api/auswertung/"):
+        teile = request.path.split("/")
+        if len(teile) >= 5:  # Bericht/Karte/Bild, nicht die Statusabfrage /api/auswertung/<id>
+            return None
+    if not hmac.compare_digest(request.headers.get(fern.KOPF, ""), LAPTOP_TOKEN):
+        return fehler("Dieser Rechner wertet nur für den verbundenen RoadSense-Browser aus.", 403)
 
 
 @app.before_request
@@ -150,11 +171,40 @@ def json_groesse():
 def sicherheits_header(antwort):
     antwort.headers.setdefault("X-Content-Type-Options", "nosniff")
     antwort.headers.setdefault("Referrer-Policy", "same-origin")
-    antwort.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+    ist_ergebnis_html = request.path.startswith("/api/auswertung/") and request.path.endswith(("Bericht.html", "Karte.html"))
+    if ist_ergebnis_html and LAPTOP_TOKEN:
+        antwort.headers["Content-Security-Policy"] = f"frame-ancestors 'self' {WEB_ORIGIN}"
+    else:
+        antwort.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+
+    # Nur der bekannte RoadSense-Web-Ursprung darf den Laptop direkt ansprechen.
+    if LAPTOP_TOKEN:
+        origin = (request.headers.get("Origin") or "").rstrip("/")
+        erlaubte = {WEB_ORIGIN, "http://127.0.0.1:8000", "http://localhost:8000"}
+        if origin in erlaubte:
+            antwort.headers["Access-Control-Allow-Origin"] = origin
+            antwort.headers["Vary"] = "Origin"
+            antwort.headers["Access-Control-Allow-Headers"] = "Content-Type, X-RoadSense-Token"
+            antwort.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     return antwort
 
 
 # --- API ----------------------------------------------------------------------
+@app.get("/api/worker-check")
+def worker_check():
+    """Direkter Browser->Laptop-Verbindungstest. Auf dem Laptop per lokalem Token geschützt."""
+    if ROLE == "web":
+        return fehler("Dies ist nur der Web-Server.", 404)
+    return jsonify({
+        "ok": True,
+        "auswertung": AUSWERTUNG_BEREIT,
+        "ki": ki.verfuegbar,
+        "modell": ki.modell if ki.verfuegbar else None,
+        "zapier": core.zapier_url_gueltig(os.environ.get("ZAPIER_WEBHOOK_URL", "")),
+        "max_fotos": MAX_FOTOS,
+    })
+
+
 @app.get("/api/status")
 def status():
     return jsonify({
@@ -165,7 +215,8 @@ def status():
         **({"auswertung": FERN.erreichbar(), "auswertung_hinweis": None if FERN.erreichbar() else
             "Der Auswerte-Laptop ist gerade nicht erreichbar. Fotos aufnehmen geht, auswerten erst, wenn er läuft."}
            if FERN.aktiv else {"auswertung": AUSWERTUNG_BEREIT}),
-        "max_fotos": aw.MAX_FOTOS,
+        "rolle": ROLE,
+        "max_fotos": MAX_FOTOS,
     })
 
 
@@ -250,7 +301,9 @@ def auswertung_starten():
         if zu_viele("upload"):
             return fehler("Zu viele Auswertungen in kurzer Zeit. Bitte eine Minute warten.", 429)
         return FERN.hochladen(request)
-    if not AUSWERTUNG_BEREIT:
+    if ROLE == "web":
+        return fehler("Bitte den Auswerte-Laptop in diesem Browser verbinden. Die Fotos werden direkt dorthin gesendet.", 503)
+    if not AUSWERTUNG_BEREIT or aw is None:
         return fehler("Die Bildauswertung ist auf diesem Server nicht eingerichtet.", 503)
     if zu_viele("upload"):
         return fehler("Zu viele Auswertungen in kurzer Zeit. Bitte eine Minute warten.", 429)
@@ -272,6 +325,8 @@ def auswertung_starten():
 def auswertung_status(aid):
     if FERN.aktiv:
         return FERN.weiter(f"/api/auswertung/{aid}")
+    if aw is None:
+        return fehler("Die Auswertung läuft auf dem lokalen Auswerte-Laptop.", 404)
     s = aw.status(aid)
     if not s:
         return fehler("Diese Auswertung gibt es nicht (mehr).", 404)
@@ -282,6 +337,8 @@ def auswertung_status(aid):
 def auswertung_datei(aid, teil):
     if FERN.aktiv:
         return FERN.weiter(f"/api/auswertung/{aid}/{teil}")
+    if aw is None:
+        return fehler("Nicht gefunden.", 404)
     p = aw.datei_pfad(aid, teil)
     if not p:
         return fehler("Nicht gefunden.", 404)

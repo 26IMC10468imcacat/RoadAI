@@ -9,6 +9,7 @@ from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 os.environ.pop("ANTHROPIC_API_KEY", None)
+os.environ["ROADSENSE_ROLE"] = "test"
 os.environ["ZAPIER_WEBHOOK_URL"] = "https://hooks.zapier.com/hooks/catch/123/abc/"
 
 import app as roadai_app  # noqa: E402

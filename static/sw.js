@@ -1,5 +1,5 @@
 // RoadSense Service Worker: App-Hülle offline verfügbar, API immer live.
-const CACHE = "roadsense-v5";
+const CACHE = "roadsense-v7-local-secrets";
 const HUELLE = ["/", "/static/style.css", "/static/fotos.js", "/static/app.js", "/static/icon-192.png", "/manifest.webmanifest"];
 
 self.addEventListener("install", (e) => {

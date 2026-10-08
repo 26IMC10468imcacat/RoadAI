@@ -61,7 +61,7 @@ ROUTEN = {
 BILDQUALITAET = {"gut", "maessig", "unbrauchbar"}
 
 # Nur Bilder und Berichte, die dieser Server selbst erzeugt hat
-_HERKUNFT = r"(?:/api/auswertung/[0-9a-f]{16}|/static/beispiele/[A-Za-z0-9_]{1,40})"
+_HERKUNFT = r"(?:/api/auswertung/(?:[0-9a-f]{16}|[0-9a-f]{32})|/static/beispiele/[A-Za-z0-9_]{1,40})"
 BILD_URL = re.compile(_HERKUNFT + r"/(?:bilder/)?[A-Za-z0-9_.-]{1,80}\.jpg")
 BERICHT_URL = re.compile(_HERKUNFT + r"/Bericht\.html")
 KARTE_URL = re.compile(_HERKUNFT + r"/Karte\.html")

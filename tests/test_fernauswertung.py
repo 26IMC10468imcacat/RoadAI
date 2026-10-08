@@ -1,4 +1,4 @@
-"""Weiterleitung an den Auswerte-Laptop: Schlüssel, Offline-Fall, keine fremden Pfade."""
+"""Schutz des lokalen Auswerte-Laptops und alter Weiterleitungs-Fallback."""
 import importlib
 import os
 import sys
@@ -10,8 +10,9 @@ import fernauswertung as fern  # noqa: E402
 
 
 def app_mit(**env):
-    alt = {k: os.environ.get(k) for k in ("AUSWERTUNG_URL", "AUSWERTUNG_TOKEN")}
-    for k in alt:
+    namen = ("ROADSENSE_ROLE", "AUSWERTUNG_URL", "AUSWERTUNG_TOKEN")
+    alt = {k: os.environ.get(k) for k in namen}
+    for k in namen:
         os.environ.pop(k, None)
     os.environ.update(env)
     try:
@@ -24,44 +25,38 @@ def app_mit(**env):
                 os.environ[k] = v
 
 
-def tearDownModule():
-    app_mit()  # App wieder im Normalbetrieb laden, damit die anderen Tests nicht betroffen sind
-
-
 class Laptop(unittest.TestCase):
+    ID = "0123456789abcdef0123456789abcdef"
+
     def test_ohne_schluessel_abgelehnt(self):
-        c = app_mit(AUSWERTUNG_TOKEN="abc")
+        c = app_mit(ROADSENSE_ROLE="local", AUSWERTUNG_TOKEN="abc")
         self.assertEqual(c.post("/api/auswertung").status_code, 403)
-        self.assertEqual(c.get("/api/auswertung/0123456789abcdef").status_code, 403)
+        self.assertEqual(c.get(f"/api/auswertung/{self.ID}").status_code, 403)
 
     def test_mit_schluessel_durchgelassen(self):
-        c = app_mit(AUSWERTUNG_TOKEN="abc")
-        r = c.get("/api/auswertung/0123456789abcdef", headers={fern.KOPF: "abc"})
-        self.assertEqual(r.status_code, 404)  # Schlüssel stimmt, Auftrag gibt es nur nicht
+        c = app_mit(ROADSENSE_ROLE="local", AUSWERTUNG_TOKEN="abc")
+        r = c.get(f"/api/auswertung/{self.ID}", headers={fern.KOPF: "abc"})
+        self.assertEqual(r.status_code, 404)
 
-    def test_startseite_bleibt_offen(self):
-        c = app_mit(AUSWERTUNG_TOKEN="abc")
+    def test_status_bleibt_offen(self):
+        c = app_mit(ROADSENSE_ROLE="local", AUSWERTUNG_TOKEN="abc")
         self.assertEqual(c.get("/api/status").status_code, 200)
 
 
 class Webseite(unittest.TestCase):
-    def test_laptop_aus(self):
-        c = app_mit(AUSWERTUNG_URL="http://127.0.0.1:9", AUSWERTUNG_TOKEN="abc")
+    def test_render_verwendet_keine_alten_worker_secrets(self):
+        c = app_mit(ROADSENSE_ROLE="web", AUSWERTUNG_URL="https://laptop.example.ts.net", AUSWERTUNG_TOKEN="abc")
         s = c.get("/api/status").get_json()
+        self.assertEqual(s["rolle"], "web")
         self.assertFalse(s["auswertung"])
-        self.assertIn("Laptop", s["auswertung_hinweis"])
-        r = c.get("/api/auswertung/0123456789abcdef")
-        self.assertEqual(r.status_code, 503)
+        self.assertEqual(c.post("/api/auswertung").status_code, 503)
 
     def test_fremde_pfade_nicht_weitergeleitet(self):
-        f = fern.Fernauswertung("http://127.0.0.1:9", "abc")
+        f = fern.Fernauswertung("https://laptop.example.ts.net", "abc")
         from flask import Flask
         with Flask(__name__).app_context():
-            self._pruefe(f)
-
-    def _pruefe(self, f):
-        for pfad in ("/api/auswertung/../../etc/passwd", "/api/status", "/api/auswertung/xyz/Bericht.html"):
-            self.assertEqual(f.weiter(pfad)[1], 404, pfad)
+            for pfad in ("/api/auswertung/../../etc/passwd", "/api/status", "/api/auswertung/xyz/Bericht.html"):
+                self.assertEqual(f.weiter(pfad)[1], 404, pfad)
 
     def test_nur_https(self):
         self.assertFalse(fern.Fernauswertung("http://laptop.example.ts.net", "abc").aktiv)
