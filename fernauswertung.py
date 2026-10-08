@@ -58,12 +58,30 @@ class Fernauswertung:
         return _fehler("Der Auswerte-Laptop ist gerade nicht erreichbar. Bitte später noch einmal versuchen.", 503)
 
     def hochladen(self, anfrage):
-        fotos = anfrage.files.getlist("fotos")
-        teile = [("fotos", (f.filename or "foto.jpg", f.stream, f.mimetype or "image/jpeg")) for f in fotos]
-        felder = {k: anfrage.form.get(k, "") for k in ("meta", "name", "ort", "breite")}
+        """Leitet den Upload als Rohdatenstrom an den Auswerte-Laptop weiter.
+
+        Wichtig für Render Free: ``request.files`` darf hier NICHT gelesen werden.
+        Werkzeug würde sonst den Multipart-Upload zerlegen und ``requests`` beim
+        erneuten Zusammensetzen die Fotos zusätzlich im RAM puffern. Bei mehreren
+        hochauflösenden Fotos kann das die 512-MB-Grenze von Render überschreiten.
+
+        Stattdessen reichen wir den originalen Multipart-Body samt Content-Type
+        unverändert und streaming weiter. Die Fotos werden erst auf dem Laptop
+        geparst und verarbeitet.
+        """
+        kopf = self._kopf()
+        content_type = anfrage.headers.get("Content-Type")
+        if content_type:
+            kopf["Content-Type"] = content_type
+        if anfrage.content_length is not None:
+            kopf["Content-Length"] = str(anfrage.content_length)
         try:
-            r = requests.post(self.url + "/api/auswertung", headers=self._kopf(), data=felder, files=teile,
-                              timeout=(6, 600))
+            r = requests.post(
+                self.url + "/api/auswertung",
+                headers=kopf,
+                data=anfrage.stream,
+                timeout=(6, 600),
+            )
         except requests.RequestException:
             return self._offline()
         return self._antwort(r)

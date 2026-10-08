@@ -108,7 +108,7 @@ Das macht ein anderes Team vermutlich, und so reagiert die App:
 
 ## Datenschutz
 
-Strecke und Chat liegen nur im Browser-Tab. Hochgeladene Fotos werden direkt nach der Auswertung gelöscht,
+Die aktuell geöffnete Strecke und der Chat liegen im Browser. Fertig ausgewertete eigene Strecken werden zusätzlich lokal im Browser gespeichert und auf der Startseite unter „Oder eine ausgewertete Strecke ansehen“ angezeigt. Hochgeladene Fotos werden direkt nach der Auswertung gelöscht,
 Bericht und Draufsichten nach 24 Stunden. Auf Draufsichten können Kennzeichen oder Personen zu sehen sein.
 An Anthropic gehen die Messwerte der Strecke (keine Fotos), an Zapier und Google die Zusammenfassung der
 Bewertung. Für echte Gemeindedaten vorher klären, ob das so passt.

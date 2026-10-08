@@ -19,7 +19,7 @@
   const $ = (s) => document.querySelector(s);
   const main = $("#inhalt");
   const zustand = {
-    status: null, beispiele: [], strecke: null, entscheidung: null, verlauf: [],
+    status: null, beispiele: [], eigeneStrecken: [], strecke: null, entscheidung: null, verlauf: [],
     ansicht: "start", modul: "condition", beschaeftigt: false, zapier: {},
     aufnahme: { fotos: [], name: "", ort: "", breite: "", auftrag: null, upload: 0, fehler: "", vorbereiten: 0 },
   };
@@ -82,6 +82,33 @@
       }
       if (d && typeof d.auftrag === "string") zustand.weiterVerfolgen = d.auftrag;
     } catch { /* ignorieren */ }
+  }
+
+  // Fertig ausgewertete eigene Strecken lokal im Browser merken.
+  // Absichtlich kein Server-/Render-Umbau: Die bestehende Render↔Laptop-Architektur bleibt unverändert.
+  const EIGENE_KEY = "roadsense.eigeneStrecken.v1";
+  function eigeneLaden() {
+    try {
+      const liste = JSON.parse(localStorage.getItem(EIGENE_KEY) || "[]");
+      zustand.eigeneStrecken = Array.isArray(liste)
+        ? liste.filter((s) => s && typeof s === "object" && typeof s.strecke_id === "string" && Array.isArray(s.abschnitte)).slice(0, 20)
+        : [];
+    } catch { zustand.eigeneStrecken = []; }
+  }
+  function eigeneSpeichern(strecke) {
+    if (!strecke || typeof strecke.strecke_id !== "string" || !Array.isArray(strecke.abschnitte)) return;
+    try {
+      const liste = zustand.eigeneStrecken.filter((s) => s.strecke_id !== strecke.strecke_id);
+      liste.unshift(strecke);
+      zustand.eigeneStrecken = liste.slice(0, 20);
+      localStorage.setItem(EIGENE_KEY, JSON.stringify(zustand.eigeneStrecken));
+    } catch { /* Browser-Speicher nicht verfügbar: App läuft trotzdem weiter */ }
+  }
+  function eigeneBeschreibung(s) {
+    const ort = s.ort ? `${s.ort} · ` : "";
+    const tag = datum(s.aufnahme);
+    const n = Array.isArray(s.abschnitte) ? s.abschnitte.length : 0;
+    return `${ort}${tag ? `Auswertung vom ${tag}` : "Eigene Auswertung"}${n ? ` · ${n} Abschnitte` : ""}`;
   }
 
   // ---------- Navigation ----------
@@ -161,12 +188,19 @@
   }
 
   function inhaltCondition() {
-    const karten = zustand.beispiele.map((b) => `
+    const eigene = zustand.eigeneStrecken.map((s) => `
+      <button class="wahl" type="button" data-aktion="laden-lokal" data-id="${esc(s.strecke_id)}">
+        <span class="symbol" aria-hidden="true">◆</span>
+        <span class="txt"><b>${esc(s.name)}</b><span class="klein">${esc(eigeneBeschreibung(s))}</span></span>
+        <span class="pfeil" aria-hidden="true">›</span>
+      </button>`).join("");
+    const beispiele = zustand.beispiele.map((b) => `
       <button class="wahl" type="button" data-aktion="laden" data-id="${esc(b.id)}">
         <span class="symbol" aria-hidden="true">${b.simuliert ? "◇" : "◆"}</span>
         <span class="txt"><b>${esc(b.name)}</b><span class="klein">${esc(b.beschreibung)}</span></span>
         <span class="pfeil" aria-hidden="true">›</span>
       </button>`).join("");
+    const karten = eigene + beispiele;
     return `
       <p class="lead">RoadSense liest die Auswertung der Straßenfotos, entscheidet, was zu tun ist, und leitet Sie zum passenden nächsten Schritt.</p>
       <button class="wahl neu" type="button" data-aktion="aufnehmen">
@@ -454,8 +488,9 @@
       if (d.auftrag.status === "fertig") {
         A.fotos.forEach((f) => f.vorschau && URL.revokeObjectURL(f.vorschau));
         zustand.aufnahme = leereAufnahme();
+        eigeneSpeichern(d.auftrag.strecke);
         neueStrecke(d.auftrag.strecke);
-        toast("Auswertung fertig.");
+        toast("Auswertung fertig und unter ausgewerteten Strecken gespeichert.");
         return;
       }
       if (d.auftrag.status === "fehler") {
@@ -723,6 +758,12 @@ Mit freundlichen Grüßen`;
     } catch (e) { toast(e.message); }
   }
 
+  function ladenLokal(id) {
+    const s = zustand.eigeneStrecken.find((x) => x.strecke_id === id);
+    if (!s) return toast("Diese gespeicherte Strecke wurde nicht gefunden.");
+    neueStrecke(s);
+  }
+
   function neueStrecke(strecke) {
     zustand.strecke = strecke;
     zustand.entscheidung = null;
@@ -737,8 +778,9 @@ Mit freundlichen Grüßen`;
     try { roh = JSON.parse(await datei.text()); } catch { return toast("Die Datei ist kein gültiges JSON."); }
     try {
       const d = await api("/api/pruefen", { strecke: roh });
+      eigeneSpeichern(d.strecke);
       neueStrecke(d.strecke);
-      toast("Auswertung geladen.");
+      toast("Auswertung geladen und gespeichert.");
     } catch (e) { toast(e.message); }
   }
 
@@ -856,6 +898,7 @@ Mit freundlichen Grüßen`;
       const d = document.getElementById("ab-" + nr2(el.dataset.nr));
       if (d) { d.open = true; d.scrollIntoView({ behavior: "smooth", block: "start" }); }
     } else if (aktion === "laden") laden(el.dataset.id);
+    else if (aktion === "laden-lokal") ladenLokal(el.dataset.id);
     else if (aktion === "hochladen") $("#datei").click();
     else if (aktion === "aufnehmen") { zeige("aufnahme"); statusLaden(); }
     else if (aktion === "modul") { zustand.modul = el.dataset.id; render(); window.scrollTo({ top: 0 }); }
@@ -902,6 +945,7 @@ Mit freundlichen Grüßen`;
 
   // ---------- Start ----------
   wiederherstellen();
+  eigeneLaden();
   render();
   if (zustand.weiterVerfolgen) {
     zustand.aufnahme.auftrag = { id: zustand.weiterVerfolgen, status: "laeuft", phase: "Auswertung läuft", erledigt: 0, gesamt: 1 };
